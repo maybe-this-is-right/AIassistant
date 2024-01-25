@@ -1,0 +1,870 @@
+I am working on building a personal AI assistant for myself.  This AI assistant will be my right hand man so to speak.  I will have my AI on my laptop and it will help me throughout the day doing a myriad of tasks, some highly advanced and others menial.  Please review the code I have attached in text format along with the structure of my AI on my computer.  Once are done analyzing all of the code and structure in full, let me know.
+
+
+Below is the structure of my AI and all of the scripts I have for my AI (I have pasted them here in text format for you to be able to review them a bit easier):
+
+C:\Users\rudym\Desktop\PersonalAI\
+│
+├── Application\
+│   ├── main.py
+│   └── personal_assistant.py
+│
+├── Building Blocks\
+│   ├── auth.py
+│   └── encryption.py
+│   └── machine_learning.py
+│   └── model_integration.py
+│   └── nlp_service
+│
+├── Configuration and Setup\
+│   └── setup.py
+│
+├── Data Management\
+│   └── database_manager.py
+│
+├── Logging and Documentation
+│   └── 
+│
+├── Supporting Functionalities\
+│   └── matplotlip_widget.py
+│   └──plugin_manager.py
+│   └──user_preferances.py
+│   └──utils.py
+│   
+├── Testing and Quality Assurance\
+│   └── 
+
+Here are the scripts in text format:
+
+
+'main.py'
+
+import sys
+import logging
+from PyQt5.QtWidgets import QApplication, QSplashScreen
+from PyQt5.QtCore import Qt, QThread
+from PyQt5.QtGui import QPixmap
+from personal_assistant import PersonalAssistant
+import time
+
+# New Thread class for system activity monitoring
+class SystemActivityMonitor(QThread):
+    def run(self):
+        while True:
+            # Implement your logic to monitor system activity here
+            # Example: Log current active window title, timestamp, etc.
+            time.sleep(60)  # Adjust the sleep time as needed
+
+def main():
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+    try:
+        app = QApplication(sys.argv)
+
+        splash_pix = QPixmap('path/to/splash_image.png')
+        if splash_pix.isNull():
+            logging.error('Splash screen image not found. Ensure the correct path is specified.')
+            sys.exit(1)
+
+        splash = QSplashScreen(splash_pix, Qt.WindowStaysOnTopHint)
+        splash.setMask(splash_pix.mask())
+        splash.show()
+        app.processEvents()
+
+        assistant = PersonalAssistant()
+        assistant.show()
+        splash.finish(assistant)
+
+        # Start the system activity monitoring thread
+        monitor = SystemActivityMonitor()
+        monitor.start()
+
+        sys.exit(app.exec_())
+    except ImportError as e:
+        logging.error(f"PyQt5 import error: {e}")
+        sys.exit(1)
+    except Exception as e:
+        logging.error(f"Unexpected error: {e}")
+        sys.exit(1)
+
+if __name__ == '__main__':
+    main()
+
+'personal_assistant.py'
+
+import logging
+import sys
+from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QVBoxLayout, QWidget
+from machine_learning import perform_classification
+from matplotlib_widget import MatplotlibWidget
+from nlp_service import process_query
+from user_preferences import UserPreferenceManager
+from database_manager import DatabaseManager
+from auth import Authenticator
+from encryption import EncryptionManager
+import joblib
+from cryptography.fernet import Fernet
+
+logging.basicConfig(filename='assistant_log.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+class PersonalAssistant(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.initUI()
+        self.preference_manager = UserPreferenceManager()
+        self.db_manager = DatabaseManager()  # SQLAlchemy-based database manager initialization
+        self.authenticator = Authenticator('your_password_here')
+        self.encryption_manager = EncryptionManager(Fernet.generate_key())
+        self.ensure_authentication()
+        logging.info("Personal Assistant Initialized")
+
+    def initUI(self):
+        self.setWindowTitle("Personal Assistant")
+        self.setGeometry(100, 100, 800, 600)
+        self.central_widget = QWidget()
+        self.setCentralWidget(self.central_widget)
+        layout = QVBoxLayout(self.central_widget)
+
+        self.output_display = QLabel("Insights will be shown here.")
+        layout.addWidget(self.output_display)
+
+    def ensure_authentication(self):
+        if not self.authenticator.authenticate():
+            logging.error("Authentication failed.")
+            sys.exit("Authentication failed.")
+
+    def onMLClassify(self):
+        input_data = [5.1, 3.5, 1.4, 0.2]  # Replace with dynamic input
+        classification_result = perform_classification(input_data)
+        self.output_display.setText(f'Iris classification result: {classification_result}')
+        logging.info("Performed Machine Learning Classification")
+
+    def onSubmit(self):
+        query = self.input_field.text()
+        response = process_query(query, self.service_selection.currentText())
+        encrypted_query = self.encryption_manager.encrypt(query)
+        encrypted_response = self.encryption_manager.encrypt(response)
+        self.db_manager.add_query(encrypted_query, encrypted_response)
+        self.output_display.setText(response)
+        logging.info("Processed and stored user query")
+
+    def query_self_insights(self):
+        # Fetch user preferences data
+        frequent_queries = self.preference_manager.get_frequent_queries()
+        preferences_text = f"Your frequent queries: {frequent_queries}"
+
+        # Fetch user activity data from database (example placeholder)
+        recent_activities = self.db_manager.get_recent_activities()  # Placeholder function
+        activities_text = f"Your recent activities: {recent_activities}"
+
+        # Combine insights and display
+        insights = preferences_text + "\n" + activities_text
+        self.output_display.setText(insights)
+        return insights
+
+# Additional utility functions and classes can be defined here
+
+'auth.py'
+
+import hashlib
+import logging
+import getpass
+import os
+import json
+from sqlalchemy import create_engine, Column, Integer, String
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+from database_manager import DatabaseManager  # Import DatabaseManager for user data handling
+
+Base = declarative_base()
+
+class User(Base):
+    __tablename__ = 'users'
+    id = Column(Integer, primary_key=True)
+    username = Column(String, unique=True)
+    password_hash = Column(String)
+    # Add a column for two-factor authentication, if necessary
+    # two_factor_secret = Column(String)
+
+class Authenticator:
+    def __init__(self, db_path):
+        self.engine = create_engine(f'sqlite:///{db_path}')
+        Base.metadata.create_all(self.engine)
+        self.Session = sessionmaker(bind=self.engine)
+
+    @staticmethod
+    def _hash_password(password):
+        return hashlib.sha256(password.encode()).hexdigest()
+
+    def _get_password_hash(self, username):
+        session = self.Session()
+        user = session.query(User).filter(User.username == username).first()
+        session.close()
+        return user.password_hash if user else None
+
+    def authenticate(self, username):
+        try:
+            password_hash = self._get_password_hash(username)
+            if not password_hash:
+                raise ValueError(f"No user found with username: {username}")
+
+            entered_password = getpass.getpass("Enter password to access the assistant: ")
+            entered_hash = self._hash_password(entered_password)
+            if entered_hash == password_hash:
+                # Here you can add a call to a two-factor authentication method
+                # if self.verify_two_factor_token(username):
+                logging.info("Authentication successful.")
+                return True
+                # else:
+                #     logging.warning("Two-factor authentication failed.")
+                #     return False
+            else:
+                logging.warning("Authentication failed.")
+                return False
+        except Exception as e:
+            logging.error(f"Error during authentication: {e}")
+            return False
+
+    def setup_password(self, username, new_password):
+        hashed_password = self._hash_password(new_password)
+        session = self.Session()
+        user = User(username=username, password_hash=hashed_password)
+        session.add(user)
+        session.commit()
+        session.close()
+
+    # Placeholder for two-factor authentication methods
+    # def setup_two_factor_authentication(self, username):
+    #     # Implementation for setting up two-factor authentication
+    #     pass
+
+    # def verify_two_factor_token(self, username, token):
+    #     # Implementation for verifying the two-factor token
+    #     pass
+
+logging.basicConfig(filename='C:/Users/rudym/Desktop/PersonalAI/Logs/auth.log', 
+                    level=logging.INFO, 
+                    format='%(asctime)s:%(levelname)s:%(message)s')
+
+# Example usage
+# authenticator = Authenticator("C:/Users/rudym/Desktop/PersonalAI/Database/mydb.db")
+# authenticator.setup_password("username", "your_secure_password")
+# is_authenticated = authenticator.authenticate("username")
+# print(is_authenticated)
+
+'encryption.py'
+
+from cryptography.fernet import Fernet
+import base64
+import logging
+from database_manager import DatabaseManager  # Import the DatabaseManager
+
+class EncryptionManager:
+    def __init__(self, db_manager: DatabaseManager):
+        self.db_manager = db_manager
+        self.fernet = self._initialize_fernet()
+
+    def _initialize_fernet(self):
+        try:
+            key = self._retrieve_encryption_key()  # Retrieve key from database
+            return Fernet(key)
+        except ValueError as e:
+            logging.error(f"Invalid key for Fernet: {e}")
+            raise ValueError("Invalid encryption key provided.")
+
+    def _retrieve_encryption_key(self):
+        # Placeholder for actual key retrieval from the database
+        return Fernet.generate_key()  # Temporary, replace with actual key retrieval
+
+    def encrypt(self, text):
+        if not isinstance(text, str):
+            logging.error("Encryption failed: Input must be a string.")
+            raise TypeError("Input for encryption must be a string.")
+        try:
+            return self.fernet.encrypt(text.encode()).decode()
+        except Exception as e:
+            logging.error(f"Encryption error: {e}")
+            raise
+
+    def decrypt(self, text):
+        if not isinstance(text, str) or not base64.urlsafe_b64decode(text):
+            logging.error("Decryption failed: Input must be a valid base64-encoded string.")
+            raise TypeError("Input for decryption must be a valid base64-encoded string.")
+        try:
+            return self.fernet.decrypt(text.encode()).decode()
+        except Exception as e:
+            logging.error(f"Decryption error: {e}")
+            raise
+
+    # Placeholder for additional encryption layers or methods
+    # def additional_encryption_layer(self, data):
+    #     # Implement additional encryption logic here
+    #     pass
+
+# Example usage
+# db_manager = DatabaseManager('path_to_database')
+# manager = EncryptionManager(db_manager)
+# encrypted = manager.encrypt("Hello World")
+# decrypted = manager.decrypt(encrypted)
+
+'machine_learning.py'
+
+import joblib
+import os
+import numpy as np
+import logging
+from sklearn.datasets import load_iris
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, confusion_matrix
+from database_manager import DatabaseManager  # Import the DatabaseManager
+
+logging.basicConfig(level=logging.INFO)
+
+class MachineLearningManager:
+    _iris_data = None
+
+    def __init__(self, db_manager: DatabaseManager, model_path='model.joblib'):
+        self.db_manager = db_manager
+        self.model_path = model_path
+        self.model = self.load_model()
+
+    @classmethod
+    def get_iris_data(cls):
+        if cls._iris_data is None:
+            cls._iris_data = load_iris()
+        return cls._iris_data
+
+    def load_model(self):
+        if os.path.exists(self.model_path):
+            try:
+                logging.info("Loading existing model.")
+                return joblib.load(self.model_path)
+            except Exception as e:
+                logging.error(f"Failed to load model: {e}")
+                return None
+        else:
+            return self.train_new_model()
+
+    def train_new_model(self):
+        logging.info("Training a new model.")
+        iris = self.get_iris_data()
+        X_train, X_test, y_train, y_test = train_test_split(iris.data, iris.target, test_size=0.3, random_state=42)
+        clf = DecisionTreeClassifier()
+        clf.fit(X_train, y_train)
+        joblib.dump(clf, self.model_path)
+        self.evaluate_model(X_test, y_test)
+        return clf
+
+    # New method for analyzing user behavior patterns
+    def analyze_user_patterns(self, data):
+        # Machine learning logic to identify patterns in user data
+        # Example: Clustering work habits, analyzing problem-solving styles, etc.
+        # Placeholder for actual implementation
+        return "Identified patterns"
+
+    def evaluate_model(self, X_test, y_test):
+        # Example evaluation logic (replace with actual evaluation)
+        predictions = self.model.predict(X_test)
+        accuracy = accuracy_score(y_test, predictions)
+        logging.info(f"Model Accuracy: {accuracy}")
+        return accuracy
+
+# Example usage
+# db_manager = DatabaseManager('path_to_database')
+# ml_manager = MachineLearningManager(db_manager)
+# result = ml_manager.perform_classification([5.1, 3.5, 1.4, 0.2])
+# print(result)
+
+'model_integration.py'
+
+import joblib
+import logging
+from typing import Any, Optional
+from database_manager import DatabaseManager  # Import the DatabaseManager
+
+logging.basicConfig(filename='model_integration.log', level=logging.INFO, format='%(asctime)s:%(levelname)s:%(message)s')
+
+class ModelIntegrationManager:
+    def __init__(self, db_manager: DatabaseManager):
+        self.db_manager = db_manager
+
+    def save_model(self, model: Any, filename: str = 'trained_model.pkl') -> None:
+        try:
+            joblib.dump(model, filename)
+            logging.info(f"Model saved successfully in {filename}")
+            # Save model details to the database if required
+            # self.db_manager.save_model_details(...)
+        except Exception as e:
+            logging.error(f"Error saving model: {e}")
+
+    def load_model(self, filename: str = 'trained_model.pkl') -> Optional[Any]:
+        try:
+            model = joblib.load(filename)
+            logging.info(f"Model loaded successfully from {filename}")
+            return model
+        except FileNotFoundError:
+            logging.error(f"Model file not found: {filename}")
+            return None
+        except Exception as e:
+            logging.error(f"Error loading model: {e}")
+            return None
+
+    # Add any additional model integration methods here
+    # For example, methods to update models, evaluate models, etc.
+
+# Example usage
+# db_manager = DatabaseManager('path_to_database')
+# model_integration_manager = ModelIntegrationManager(db_manager)
+# model = model_integration_manager.load_model("specific_model.pkl")
+# if model:
+#     prediction = model_integration_manager.make_prediction(model, [5.1, 3.5, 1.4, 0.2])
+
+'nlp_service.py'
+
+import requests
+import spacy
+import nltk
+from spacy import displacy
+from nltk.sentiment import SentimentIntensityAnalyzer
+from typing import Optional
+from database_manager import DatabaseManager  # Import the DatabaseManager
+
+# Ensure NLTK's VADER lexicon is downloaded
+nltk.download('vader_lexicon', quiet=True)
+
+# Load spaCy's English language model
+nlp = spacy.load("en_core_web_lg")  # Large model for more capabilities
+sia = SentimentIntensityAnalyzer()
+
+class NLPServices:
+    def __init__(self, db_manager: DatabaseManager):
+        self.db_manager = db_manager
+
+    @staticmethod
+    def process_with_openai(query: str, api_key: str) -> str:
+        # Existing method remains the same...
+    
+    @staticmethod
+    def process_with_spacy(query: str) -> dict:
+        # Existing method remains the same...
+    
+    @staticmethod
+    def process_with_nltk(query: str) -> str:
+        # Existing method remains the same...
+
+    # New method for deep conversation analysis
+    def analyze_conversation(self, conversation):
+        # Advanced NLP logic to analyze conversation content and sentiment
+        # Example: Use spaCy for entity recognition, NLTK for sentiment analysis, etc.
+        # Placeholder for actual implementation
+        return "Conversation analysis results"
+
+def process_query(query: str, service: str, db_manager: DatabaseManager, openai_api_key: Optional[str] = None) -> str:
+    nlp_services = NLPServices(db_manager)
+    if service == 'OpenAI':
+        # Existing logic remains the same...
+    elif service == 'spaCy':
+        return nlp_services.process_with_spacy(query)
+    elif service == 'NLTK':
+        return nlp_services.process_with_nltk(query)
+    else:
+        return "Invalid service specified."
+
+# Example usage
+# db_manager = DatabaseManager('path_to_database')
+# print(process_query("Who is the president of the United States?", "OpenAI", db_manager, "YOUR_OPENAI_API_KEY"))
+# print(process_query("Apple is looking at buying U.K. startup for $1 billion", "spaCy", db_manager))
+# print(process_query("This is a sample sentence for NLTK processing.", "NLTK", db_manager))
+
+'setup.py'
+
+import hashlib
+import json
+from cryptography.fernet import Fernet
+import os
+import sys
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel, QLineEdit, QPushButton
+
+class SetupUI(QWidget):
+    def __init__(self, config_path):
+        super().__init__()
+        self.config_path = config_path
+        self.initUI()
+
+    def initUI(self):
+        layout = QVBoxLayout()
+
+        self.label = QLabel("Please create a password for your AI assistant:")
+        self.password_input = QLineEdit()
+        self.password_input.setEchoMode(QLineEdit.Password)
+        self.submit_button = QPushButton("Submit")
+        self.submit_button.clicked.connect(self.onSubmit)
+
+        layout.addWidget(self.label)
+        layout.addWidget(self.password_input)
+        layout.addWidget(self.submit_button)
+
+        self.setLayout(layout)
+        self.setWindowTitle("AI Assistant Setup")
+        self.show()
+
+    def onSubmit(self):
+        password = self.password_input.text()
+        if password:
+            try:
+                setup_configuration(password, self.config_path)
+                self.label.setText("Setup complete.")
+            except Exception as e:
+                self.label.setText(f"Error: {e}")
+        else:
+            self.label.setText("Password cannot be empty.")
+
+def generate_fernet_key():
+    return Fernet.generate_key()
+
+def hash_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def save_configuration(key, hashed_password, config_path):
+    with open(config_path, 'w') as config_file:
+        json.dump({"fernet_key": key.decode(), "hashed_password": hashed_password}, config_file)
+
+def setup_configuration(password, config_path):
+    key = generate_fernet_key()
+    hashed_password = hash_password(password)
+    save_configuration(key, hashed_password, config_path)
+
+def run_setup(config_path):
+    app = QApplication(sys.argv)
+    ex = SetupUI(config_path)
+    sys.exit(app.exec_())
+
+if __name__ == "__main__":
+    config_directory = "C:/Users/rudym/Desktop/PersonalAI/Config"
+    config_filename = "config.json"
+    config_path = os.path.join(config_directory, config_filename)
+
+    if not os.path.exists(config_directory):
+        os.makedirs(config_directory)
+
+    run_setup(config_path)
+
+'database_manager.py'
+
+from sqlalchemy import create_engine, Column, Integer, String, DateTime
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+import datetime
+import logging
+
+logging.basicConfig(filename='database_manager.log', level=logging.INFO, format='%(asctime)s:%(levelname)s:%(message)s')
+
+Base = declarative_base()
+
+class Query(Base):
+    __tablename__ = 'queries'
+    id = Column(Integer, primary_key=True)
+    query = Column(String)
+    response = Column(String)
+    prediction = Column(String, nullable=True)
+    timestamp = Column(DateTime, default=datetime.datetime.utcnow)
+
+class UserActivity(Base):
+    __tablename__ = 'user_activities'
+    id = Column(Integer, primary_key=True)
+    activity = Column(String)
+    start_time = Column(DateTime)
+    end_time = Column(DateTime, nullable=True)
+
+class DatabaseManager:
+    def __init__(self, db_path):
+        self.engine = create_engine(f'sqlite:///{db_path}')
+        Base.metadata.create_all(self.engine)
+        self.Session = sessionmaker(bind=self.engine)
+        logging.info("Database Manager initialized with SQLAlchemy")
+
+    def add_query(self, query, response, prediction=None):
+        session = self.Session()
+        new_query = Query(query=query, response=response, prediction=prediction, timestamp=datetime.datetime.utcnow())
+        session.add(new_query)
+        session.commit()
+        logging.info("Query added successfully")
+        session.close()
+
+    def get_all_queries(self):
+        session = self.Session()
+        queries = session.query(Query).all()
+        session.close()
+        return queries
+
+    def update_query(self, query_id, new_query=None, new_response=None, new_prediction=None):
+        session = self.Session()
+        query = session.query(Query).filter(Query.id == query_id).first()
+        if query:
+            if new_query:
+                query.query = new_query
+            if new_response:
+                query.response = new_response
+            if new_prediction:
+                query.prediction = new_prediction
+            session.commit()
+            logging.info(f"Updated query with ID {query_id}")
+            session.close()
+            return True
+        else:
+            logging.warning(f"No query found with ID {query_id}")
+            session.close()
+            return False
+
+    # New method to log user activity
+    def log_user_activity(self, activity, start_time, end_time=None):
+        session = self.Session()
+        new_activity = UserActivity(activity=activity, start_time=start_time, end_time=end_time)
+        session.add(new_activity)
+        session.commit()
+        logging.info("User activity logged successfully")
+        session.close()
+
+    # Placeholder for methods to retrieve user activities
+    # def get_recent_activities(self):
+    #     # Implement logic to fetch recent user activities
+    #     pass
+
+# Example usage
+# db_manager = DatabaseManager('path_to_database')
+# db_manager.add_query("Sample query", "Sample response")
+# print(db_manager.get_all_queries())
+
+'matplotlib_widget.py'
+
+from PyQt5.QtWidgets import QWidget, QVBoxLayout
+from PyQt5.QtWebEngineWidgets import QWebEngineView
+import plotly.graph_objects as go
+from plotly.offline import plot
+import plotly.express as px
+
+class MatplotlibWidget(QWidget):
+    def __init__(self, parent=None):
+        super(MatplotlibWidget, self).__init__(parent)
+        self.layout = QVBoxLayout(self)
+        self.web_view = QWebEngineView(self)
+        self.layout.addWidget(self.web_view)
+
+    def plot_data(self, data, chart_type='line', title="Chart"):
+        fig = None
+        if chart_type == 'line':
+            fig = go.Figure(data=go.Scatter(y=data))
+        elif chart_type == 'bar':
+            fig = go.Figure(data=go.Bar(y=data))
+        elif chart_type == 'scatter':
+            fig = go.Figure(data=go.Scatter(y=data, mode='markers'))
+        elif chart_type == 'pie':
+            fig = px.pie(values=data, names=[str(x) for x in range(len(data))])
+        elif chart_type == 'histogram':
+            fig = px.histogram(x=data)
+
+        if fig:
+            fig.update_layout(title=title)
+            plot_div = plot(fig, output_type='div', include_plotlyjs='cdn')
+            self.web_view.setHtml(plot_div)
+
+    # Additional plotting methods can be added here
+    # Example: Time series, heatmaps, box plots, etc.
+
+# Example usage
+# widget = MatplotlibWidget()
+# widget.plot_data([1, 2, 3, 4], 'line', 'Sample Line Chart')
+
+'plugin_manager.py'
+
+import os
+import importlib
+import logging
+
+class PluginManager:
+    def __init__(self):
+        self.plugins = {}
+        self.plugin_directory = "plugins"
+        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+    def load_plugin(self, plugin):
+        plugin_name = plugin.__class__.__name__
+        self.plugins[plugin_name] = plugin
+        logging.info(f"Plugin {plugin_name} loaded")
+
+    def remove_plugin(self, plugin_name):
+        if plugin_name in self.plugins:
+            del self.plugins[plugin_name]
+            logging.info(f"Plugin {plugin_name} removed")
+
+    def update_plugin(self, plugin):
+        plugin_name = plugin.__class__.__name__
+        self.plugins[plugin_name] = plugin
+        logging.info(f"Plugin {plugin_name} updated")
+
+    def execute_plugins(self, query):
+        responses = []
+        for plugin_name, plugin in self.plugins.items():
+            response = plugin.process(query)
+            responses.append((plugin_name, response))
+        return responses
+
+    def load_plugins_from_directory(self):
+        for filename in os.listdir(self.plugin_directory):
+            if filename.endswith(".py") and not filename.startswith("__"):
+                module_name = filename[:-3]
+                module = importlib.import_module(f"{self.plugin_directory}.{module_name}")
+                for attribute_name in dir(module):
+                    attribute = getattr(module, attribute_name)
+                    if callable(attribute) and attribute is not attribute.__class__:
+                        self.load_plugin(attribute())
+                logging.info(f"Plugins from directory {self.plugin_directory} loaded")
+
+# Example usage
+# plugin_manager = PluginManager()
+# plugin_manager.load_plugins_from_directory()
+# responses = plugin_manager.execute_plugins("Sample query")
+# for plugin_name, response in responses:
+#     print(f"Response from {plugin_name}: {response}")
+
+'user_preferences.py'
+
+from collections import Counter
+import json
+import logging
+
+class UserPreferenceManager:
+    def __init__(self, storage_path='user_prefs.json'):
+        self.storage_path = storage_path
+        self.query_counter = self._load_preferences()
+        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+    def _load_preferences(self):
+        try:
+            with open(self.storage_path, 'r') as file:
+                return Counter(json.load(file))
+        except FileNotFoundError:
+            logging.warning(f"Preferences file not found. Creating a new one at {self.storage_path}")
+            return Counter()
+
+    def _save_preferences(self):
+        with open(self.storage_path, 'w') as file:
+            json.dump(dict(self.query_counter), file)
+            logging.info("Preferences saved successfully")
+
+    def update_preferences(self, query):
+        self.query_counter[query] += 1
+        self._save_preferences()
+
+    def get_frequent_queries(self):
+        return self.query_counter.most_common()
+
+    def reset_preferences(self):
+        self.query_counter.clear()
+        self._save_preferences()
+        logging.info("Preferences reset")
+
+    def remove_query_preference(self, query):
+        if query in self.query_counter:
+            del self.query_counter[query]
+            self._save_preferences()
+            logging.info(f"Preference for query '{query}' removed")
+
+# Example usage
+# user_pref_manager = UserPreferenceManager()
+# user_pref_manager.update_preferences("Sample query")
+# print(user_pref_manager.get_frequent_queries())
+# user_pref_manager.remove_query_preference("Sample query")
+# user_pref_manager.reset_preferences()
+
+'utils.py'
+
+from PyQt5.QtCore import QThread, pyqtSignal
+import logging
+import datetime
+import json
+import re
+import requests
+
+# Basic logging setup
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+class Worker(QThread):
+    finished = pyqtSignal(str)
+    error = pyqtSignal(Exception)
+
+    def __init__(self, func, *args, **kwargs):
+        super(Worker, self).__init__()
+        self.func = func
+        self.args = args
+        self.kwargs = kwargs
+
+    def run(self):
+        try:
+            result = self.func(*self.args, **self.kwargs)
+            self.finished.emit(result)
+        except Exception as e:
+            self.error.emit(e)
+            logging.error(f"Error in worker thread: {e}")
+
+def async_execute(func, callback=None):
+    def wrapper(*args, **kwargs):
+        worker = Worker(func, *args, **kwargs)
+        if callback:
+            worker.finished.connect(callback)
+        else:
+            worker.finished.connect(lambda res: logging.info(f"Async execution result: {res}"))
+        worker.error.connect(lambda e: logging.error(f"Error in async execution: {e}"))
+        worker.start()
+        logging.info("Worker thread started for asynchronous execution")
+    return wrapper
+
+def get_current_time_formatted():
+    return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+def load_json_file(file_path):
+    try:
+        with open(file_path, 'r') as file:
+            return json.load(file)
+    except FileNotFoundError:
+        logging.error(f"JSON file not found: {file_path}")
+        return None
+
+def save_json_file(data, file_path):
+    try:
+        with open(file_path, 'w') as file:
+            json.dump(data, file, indent=4)
+            logging.info(f"JSON data saved to {file_path}")
+    except Exception as e:
+        logging.error(f"Error saving JSON data: {e}")
+
+def clean_text(text):
+    return re.sub(' +', ' ', re.sub(r'[^\w\s]', '', text))
+
+def download_file(url, destination):
+    try:
+        response = requests.get(url)
+        with open(destination, 'wb') as file:
+            file.write(response.content)
+        logging.info(f"File downloaded from {url} to {destination}")
+    except Exception as e:
+        logging.error(f"Error downloading file: {e}")
+
+# Additional utility functions can be added here
+# Example: Date and time utilities, data transformation functions, etc.
+
+# Example usage of async_execute
+# @async_execute
+# def sample_async_function():
+#     # Sample function logic here
+
+
+
+
+
+
+
+
+
+
