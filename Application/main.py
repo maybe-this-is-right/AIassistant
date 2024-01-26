@@ -1,18 +1,29 @@
 import sys
 import logging
+import datetime
 from PyQt5.QtWidgets import QApplication, QSplashScreen
 from PyQt5.QtCore import Qt, QThread
 from PyQt5.QtGui import QPixmap
 from personal_assistant import PersonalAssistant
+from database_manager import DatabaseManager
 import time
 
-# New Thread class for system activity monitoring
 class SystemActivityMonitor(QThread):
+    def __init__(self, db_manager):
+        super().__init__()
+        self.db_manager = db_manager
+        self.logon_time = datetime.datetime.now()
+
     def run(self):
         while True:
-            # Implement your logic to monitor system activity here
-            # Example: Log current active window title, timestamp, etc.
-            time.sleep(60)  # Adjust the sleep time as needed
+            time.sleep(3600)  # 1 hour
+            self.logoff_time = datetime.datetime.now()
+            self.log_activity()
+            self.logon_time = datetime.datetime.now()  # Reset logon time for the next cycle
+
+    def log_activity(self):
+        duration = int((self.logoff_time - self.logon_time).total_seconds() / 60)
+        self.db_manager.add_time_management_log(self.logon_time, self.logoff_time, duration)
 
 def main():
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -26,16 +37,15 @@ def main():
             sys.exit(1)
 
         splash = QSplashScreen(splash_pix, Qt.WindowStaysOnTopHint)
-        splash.setMask(splash_pix.mask())
         splash.show()
         app.processEvents()
 
-        assistant = PersonalAssistant()
+        db_manager = DatabaseManager('path/to/your/database.db')
+        assistant = PersonalAssistant(db_manager)
         assistant.show()
         splash.finish(assistant)
 
-        # Start the system activity monitoring thread
-        monitor = SystemActivityMonitor()
+        monitor = SystemActivityMonitor(db_manager)
         monitor.start()
 
         sys.exit(app.exec_())

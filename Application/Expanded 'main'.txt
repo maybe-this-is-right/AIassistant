@@ -1,0 +1,115 @@
+Expanded 'main'
+
+import datetime
+
+class SystemActivityMonitor(QThread):
+    # ... existing code ...
+
+    def run(self):
+        while True:
+            # Assuming logon_time is set when the thread starts
+            logon_time = datetime.datetime.now()
+
+            # Monitor activity here
+            # ...
+
+            # Assuming logoff_time is captured when the thread stops or at regular intervals
+            logoff_time = datetime.datetime.now()
+
+            # Calculate duration in minutes
+            duration = int((logoff_time - logon_time).total_seconds() / 60)
+
+            # Automatically log this data
+            self.log_activity(logon_time, logoff_time, duration)
+
+            time.sleep(60)  # Sleep for a minute or suitable interval
+
+    def log_activity(self, logon_time, logoff_time, duration):
+        # Placeholder for logic to insert data into the database
+        # Example: self.db_manager.add_time_management_log(logon_time, logoff_time, duration)
+        pass
+
+import datetime
+
+class SystemActivityMonitor(QThread):
+    def __init__(self, db_manager):
+        super().__init__()
+        self.db_manager = db_manager
+        self.logon_time = datetime.datetime.now()
+
+    def run(self):
+        while True:
+            # Activity monitoring logic here
+            # ...
+
+            # For demonstration, let's assume we log off after a fixed interval (e.g., every hour)
+            time.sleep(3600)  # 1 hour
+            self.logoff_time = datetime.datetime.now()
+
+            # Automatically log this data
+            self.log_activity()
+
+    def log_activity(self):
+        duration = int((self.logoff_time - self.logon_time).total_seconds() / 60)
+        self.db_manager.add_time_management_log(self.logon_time, self.logoff_time, duration)
+        self.logon_time = datetime.datetime.now()  # Reset logon time for the next cycle
+
+class SystemActivityMonitor(QThread):
+    def __init__(self, db_manager):
+        super().__init__()
+        self.db_manager = db_manager
+        # ... rest of the initialization ...
+
+# ... rest of the SystemActivityMonitor code ...
+
+class SystemActivityMonitor(QThread):
+    def __init__(self, db_manager):
+        super().__init__()
+        self.db_manager = db_manager
+        self.logon_time = datetime.datetime.now()
+
+    def run(self):
+        while True:
+            time.sleep(3600)  # 1 hour
+            self.logoff_time = datetime.datetime.now()
+            self.log_activity()
+            self.logon_time = datetime.datetime.now()  # Reset logon time for the next cycle
+
+    def log_activity(self):
+        duration = int((self.logoff_time - self.logon_time).total_seconds() / 60)
+        self.db_manager.add_time_management_log(self.logon_time, self.logoff_time, duration)
+
+def main():
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+    try:
+        app = QApplication(sys.argv)
+
+        splash_pix = QPixmap('path/to/splash_image.png')
+        if splash_pix.isNull():
+            logging.error('Splash screen image not found. Ensure the correct path is specified.')
+            sys.exit(1)
+
+        splash = QSplashScreen(splash_pix, Qt.WindowStaysOnTopHint)
+        splash.show()
+        app.processEvents()
+
+        db_manager = DatabaseManager('path/to/your/database.db')
+        assistant = PersonalAssistant(db_manager)
+        assistant.show()
+        splash.finish(assistant)
+
+        monitor = SystemActivityMonitor(db_manager)
+        monitor.start()
+
+        sys.exit(app.exec_())
+    except ImportError as e:
+        logging.error(f"PyQt5 import error: {e}")
+        sys.exit(1)
+    except Exception as e:
+        logging.error(f"Unexpected error: {e}")
+        sys.exit(1)
+
+if __name__ == '__main__':
+    main()
+
